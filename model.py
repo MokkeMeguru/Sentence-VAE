@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.utils.rnn as rnn_utils
 from utils import to_var
 
-class SentenceVAE(nn.Module):
+class SentenceAE(nn.Module):
 
     def __init__(self, vocab_size, embedding_size, rnn_type, hidden_size, word_dropout, embedding_dropout, latent_size,
                 sos_idx, eos_idx, pad_idx, unk_idx, max_sequence_length, num_layers=1, bidirectional=False):
@@ -42,8 +42,9 @@ class SentenceVAE(nn.Module):
 
         self.hidden_factor = (2 if bidirectional else 1) * num_layers
 
-        self.hidden2mean = nn.Linear(hidden_size * self.hidden_factor, latent_size)
-        self.hidden2logv = nn.Linear(hidden_size * self.hidden_factor, latent_size)
+        self.hidden2hidden = nn.Linear(hidden_size * self.hidden_factor, latent_size)
+        # self.hidden2mean = nn.Linear(hidden_size * self.hidden_factor, latent_size)
+        # self.hidden2logv = nn.Linear(hidden_size * self.hidden_factor, latent_size)
         self.latent2hidden = nn.Linear(latent_size, hidden_size * self.hidden_factor)
         self.outputs2vocab = nn.Linear(hidden_size * (2 if bidirectional else 1), vocab_size)
 
@@ -67,13 +68,14 @@ class SentenceVAE(nn.Module):
             hidden = hidden.squeeze()
 
         # REPARAMETERIZATION
-        mean = self.hidden2mean(hidden)
-        logv = self.hidden2logv(hidden)
-        std = torch.exp(0.5 * logv)
+        # mean = self.hidden2mean(hidden)
+        # logv = self.hidden2logv(hidden)
+        # std = torch.exp(0.5 * logv)
 
-        z = to_var(torch.randn([batch_size, self.latent_size]))
-        z = z * std + mean
-
+        # z = to_var(torch.randn([batch_size, self.latent_size]))
+        # z = z * std + mean
+        # AE 
+        z = self.hidden2hidden(hidden)
         # DECODER
         hidden = self.latent2hidden(z)
 
@@ -111,7 +113,7 @@ class SentenceVAE(nn.Module):
         logp = logp.view(b, s, self.embedding.num_embeddings)
 
 
-        return logp, mean, logv, z
+        return logp, None, None, z
 
 
     def inference(self, n=4, z=None):
